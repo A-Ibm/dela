@@ -20,8 +20,46 @@ func NewMinimal() node.Initializer {
 // - implements node.Initializer
 type minimal struct{}
 
-// Build implements node.Initializer. In this case we don't need any command.
-func (m minimal) SetCommands(_ node.Builder) {}
+// Build implements node.Initializer.
+func (m minimal) SetCommands(builder node.Builder) {
+	cmd := builder.SetCommand("dkg")
+	cmd.SetDescription("... ")
+
+	sub := cmd.SetSubCommand("init")
+	sub.SetDescription("Initialize the DKG protocol")
+	sub.SetAction(builder.MakeAction(&initAction{}))
+
+	sub = cmd.SetSubCommand("setup")
+	sub.SetDescription("Creates the public distributed key and the private share on each node")
+	sub.SetAction(builder.MakeAction(&setupAction{}))
+
+	sub = cmd.SetSubCommand("getPublicKey")
+	sub.SetDescription("Prints the public Key")
+	sub.SetAction(builder.MakeAction(&getPublicKeyAction{}))
+
+	sub = cmd.SetSubCommand("encrypt")
+	sub.SetDescription("Encrypt the given string and write the ciphertext pair in the corresponding file")
+	sub.SetFlags(cli.StringFlag{
+		Name:     "plaintext",
+		Usage:    "plaintext to encrypt",
+		Required: true,
+	}, cli.StringFlag{
+		Name:     "filePath",
+		Usage:    "path to write the ciphertext pair",
+		Required: true,
+	})
+	sub.SetAction(builder.MakeAction(&encryptAction{}))
+
+	sub = cmd.SetSubCommand("decrypt")
+	sub.SetDescription("Decrypt the given ciphertext pair and print the corresponding plaintext")
+	sub.SetFlags(cli.StringFlag{
+		Name:     "filePath",
+		Usage:    "path to read the ciphertext pair",
+		Required: true,
+	})
+	sub.SetAction(builder.MakeAction(&decryptAction{}))
+
+}
 
 // OnStart implements node.Initializer. It creates and registers a pedersen DKG.
 func (m minimal) OnStart(ctx cli.Flags, inj node.Injector) error {

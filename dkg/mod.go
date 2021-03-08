@@ -27,4 +27,6 @@ type Actor interface {
 	Decrypt(K, C kyber.Point) ([]byte, error)
 
 	Reshare() error
+
+	//GetStartRes() (*pedersen.state)
 }
