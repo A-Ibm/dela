@@ -1,14 +1,21 @@
 package controller
 
 import (
+	"encoding/base64"
+	"fmt"
 	"go.dedis.ch/dela"
 	"go.dedis.ch/dela/cli/node"
 	"go.dedis.ch/dela/core/ordering/cosipbft/authority"
 	"go.dedis.ch/dela/crypto"
+	"go.dedis.ch/dela/crypto/ed25519"
 	"go.dedis.ch/dela/dkg"
 	"go.dedis.ch/dela/mino"
+	"go.dedis.ch/kyber/v3"
 	"golang.org/x/xerrors"
+	"strings"
 )
+
+const separator = ":"
 
 type initAction struct {
 }
@@ -34,20 +41,18 @@ type setupAction struct {
 }
 
 func (a *setupAction) Execute(ctx node.Context) error {
+	roster, err := a.readMembers(ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to read roster: %v", err)
+	}
+
 	var actor dkg.Actor
-	err := ctx.Injector.Resolve(&actor)
+	err = ctx.Injector.Resolve(&actor)
 	if err != nil {
 		return xerrors.Errorf("failed to resolve actor: %v", err)
 	}
 
-	//addrs := actor.(*pedersen.Actor)
-
-	addrs := make([]mino.Address, 5)
-	pubkeys := make([]crypto.PublicKey, 5)
-
-	ca := authority.New(addrs, pubkeys)
-
-	pubkey, err := actor.Setup(ca, ca.Len())
+	pubkey, err := actor.Setup(roster, roster.Len())
 	if err != nil {
 		return xerrors.Errorf("failed to setup DKG: %v", err)
 	}
@@ -62,6 +67,93 @@ func (a *setupAction) Execute(ctx node.Context) error {
 		Msg("DKG public key")
 
 	return nil
+}
+
+type exportInfoAction struct {
+}
+
+func (a *exportInfoAction) Execute(ctx node.Context) error {
+	var m mino.Mino
+	err := ctx.Injector.Resolve(&m)
+	if err != nil {
+		return xerrors.Errorf("injector: %v", err)
+	}
+
+	addr, err := m.GetAddress().MarshalText()
+	if err != nil {
+		return xerrors.Errorf("failed to marshal address: %v", err)
+	}
+	var pubkey kyber.Point
+	err = ctx.Injector.Resolve(&pubkey)
+	if err != nil {
+		return xerrors.Errorf("injector: %v", err)
+	}
+
+	pubkeyMarshalled, err := pubkey.MarshalBinary()
+	if err != nil {
+		return xerrors.Errorf("failed to marshal public key: %v", err)
+	}
+
+	desc := base64.StdEncoding.EncodeToString(addr) + separator + base64.StdEncoding.EncodeToString(pubkeyMarshalled)
+
+	fmt.Fprint(ctx.Out, desc)
+
+	return nil
+}
+
+func (a setupAction) readMembers(ctx node.Context) (authority.Authority, error) {
+	members := ctx.Flags.StringSlice("member")
+
+	addrs := make([]mino.Address, len(members))
+	pubkeys := make([]crypto.PublicKey, len(members))
+
+	for i, member := range members {
+		addr, pubkey, err := decodeMember(ctx, member)
+		if err != nil {
+			return nil, xerrors.Errorf("failed to decode: %v", err)
+		}
+
+		addrs[i] = addr
+		pubkeys[i] = pubkey
+	}
+
+	return authority.New(addrs, pubkeys), nil
+}
+
+func decodeMember(ctx node.Context, str string) (mino.Address, crypto.PublicKey, error) {
+	parts := strings.Split(str, separator)
+	if len(parts) != 2 {
+		return nil, nil, xerrors.New("invalid member base64 string")
+	}
+
+	// 1. Deserialize the address.
+	var m mino.Mino
+	err := ctx.Injector.Resolve(&m)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("injector: %v", err)
+	}
+
+	addrBuf, err := base64.StdEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, nil, xerrors.Errorf("base64 address: %v", err)
+	}
+
+	addr := m.GetAddressFactory().FromText(addrBuf)
+
+	// 2. Deserialize the public key.
+	publicKeyFactory := ed25519.NewPublicKeyFactory()
+
+	pubkeyBuf, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, nil, xerrors.Errorf("base64 public key: %v", err)
+	}
+
+	pubkey, err := publicKeyFactory.FromBytes(pubkeyBuf)
+	if err != nil {
+		return nil, nil, xerrors.Errorf("failed to decode public key: %v", err)
+	}
+
+	return addr, pubkey, nil
 }
 
 type getPublicKeyAction struct {

@@ -31,7 +31,16 @@ func (m minimal) SetCommands(builder node.Builder) {
 
 	sub = cmd.SetSubCommand("setup")
 	sub.SetDescription("Creates the public distributed key and the private share on each node")
+	sub.SetFlags(cli.StringSliceFlag{
+		Name:     "member",
+		Usage:    "nodes participating in DKG",
+		Required: true,
+	})
 	sub.SetAction(builder.MakeAction(&setupAction{}))
+
+	sub = cmd.SetSubCommand("export")
+	sub.SetDescription("Export the node Address")
+	sub.SetAction(builder.MakeAction(&exportInfoAction{}))
 
 	sub = cmd.SetSubCommand("getPublicKey")
 	sub.SetDescription("Prints the public Key")
@@ -72,6 +81,7 @@ func (m minimal) OnStart(ctx cli.Flags, inj node.Injector) error {
 	dkg, pubkey := pedersen.NewPedersen(no)
 
 	inj.Inject(dkg)
+	inj.Inject(pubkey)
 
 	pubkeyBuf, err := pubkey.MarshalBinary()
 	if err != nil {
@@ -81,6 +91,8 @@ func (m minimal) OnStart(ctx cli.Flags, inj node.Injector) error {
 	dela.Logger.Info().
 		Hex("public key", pubkeyBuf).
 		Msg("perdersen public key")
+
+	//dela.Logger.Info().Msg( base64.StdEncoding.EncodeToString(pubkeyBuf))
 
 	return nil
 }
