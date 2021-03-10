@@ -29,6 +29,7 @@ func (m minimal) SetCommands(builder node.Builder) {
 	sub.SetDescription("Initialize the DKG protocol")
 	sub.SetAction(builder.MakeAction(&initAction{}))
 
+	//memcoin --config /tmp/node1 dkg setup --member $(memcoin --config /tmp/node1 dkg export) --member $(memcoin --config /tmp/node2 dkg export)
 	sub = cmd.SetSubCommand("setup")
 	sub.SetDescription("Creates the public distributed key and the private share on each node")
 	sub.SetFlags(cli.StringSliceFlag{
@@ -46,6 +47,7 @@ func (m minimal) SetCommands(builder node.Builder) {
 	sub.SetDescription("Prints the public Key")
 	sub.SetAction(builder.MakeAction(&getPublicKeyAction{}))
 
+	//memcoin --config /tmp/node1 dkg encrypt --plaintext Hello --KfilePath K --CfilePath C
 	sub = cmd.SetSubCommand("encrypt")
 	sub.SetDescription("Encrypt the given string and write the ciphertext pair in the corresponding file")
 	sub.SetFlags(cli.StringFlag{
@@ -53,17 +55,26 @@ func (m minimal) SetCommands(builder node.Builder) {
 		Usage:    "plaintext to encrypt",
 		Required: true,
 	}, cli.StringFlag{
-		Name:     "filePath",
-		Usage:    "path to write the ciphertext pair",
+		Name:     "KfilePath",
+		Usage:    "path to write the K element of the ciphertext pair",
+		Required: true,
+	}, cli.StringFlag{
+		Name:     "CfilePath",
+		Usage:    "path to write the C element of the ciphertext pair",
 		Required: true,
 	})
 	sub.SetAction(builder.MakeAction(&encryptAction{}))
 
+	//memcoin --config /tmp/node2 dkg decrypt --KfilePath K --CfilePath C
 	sub = cmd.SetSubCommand("decrypt")
 	sub.SetDescription("Decrypt the given ciphertext pair and print the corresponding plaintext")
 	sub.SetFlags(cli.StringFlag{
-		Name:     "filePath",
-		Usage:    "path to read the ciphertext pair",
+		Name:     "KfilePath",
+		Usage:    "path to retreive the K element of the ciphertext pair",
+		Required: true,
+	}, cli.StringFlag{
+		Name:     "CfilePath",
+		Usage:    "path to retreive the C element of the ciphertext pair",
 		Required: true,
 	})
 	sub.SetAction(builder.MakeAction(&decryptAction{}))
