@@ -6,6 +6,7 @@
 package controller
 
 import (
+	"io/ioutil"
 	"sync"
 
 	"go.dedis.ch/dela/crypto"
@@ -78,6 +79,89 @@ func (a *addAction) Execute(ctx node.Context) error {
 	}
 
 	return nil
+}
+
+type addFileAction struct {
+	sync.Mutex
+
+	client *client
+}
+
+// Execute implements node.ActionTemplate
+func (a *addFileAction) Execute(ctx node.Context) error {
+	a.Lock()
+	defer a.Unlock()
+
+	var p pool.Pool
+	err := ctx.Injector.Resolve(&p)
+	if err != nil {
+		return xerrors.Errorf("injector: %v", err)
+	}
+
+	args, err := getArgsOfAddFile(ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get args: %v", err)
+	}
+
+	signer, err := getSigner(ctx)
+	if err != nil {
+		return xerrors.Errorf("failed to get signer: %v", err)
+	}
+
+	nonce := ctx.Flags.Int(nonceFlag)
+	if nonce != -1 {
+		a.client.nonce = uint64(nonce)
+	}
+
+	manager := getManager(signer, a.client)
+
+	err = manager.Sync()
+	if err != nil {
+		return xerrors.Errorf("failed to sync manager: %v", err)
+	}
+
+	tx, err := manager.Make(args...)
+	if err != nil {
+		return xerrors.Errorf("creating transaction: %v", err)
+	}
+
+	err = p.Add(tx)
+	if err != nil {
+		return xerrors.Errorf("failed to include tx: %v", err)
+	}
+
+	return nil
+}
+
+// getArgs extracts and parses arguments from the context.
+func getArgsOfAddFile(ctx node.Context) ([]txn.Arg, error) {
+	inArgs := ctx.Flags.StringSlice("args")
+	if len(inArgs)%2 != 0 {
+		return nil, xerrors.New("number of args should be even")
+	}
+
+	args := make([]txn.Arg, len(inArgs)/2)
+	for i := 0; i < len(args); i++ {
+		if inArgs[i*2] == "value:value" {
+			marshalledValue, err := ioutil.ReadFile(inArgs[i*2+1])
+			if err != nil {
+				return nil, xerrors.Errorf("failed to read K file: %v", err)
+			}
+			args[i] = txn.Arg{
+				Key:   inArgs[i*2],
+				Value: marshalledValue,
+			}
+
+		} else {
+			args[i] = txn.Arg{
+				Key:   inArgs[i*2],
+				Value: []byte(inArgs[i*2+1]),
+			}
+		}
+
+	}
+
+	return args, nil
 }
 
 // getArgs extracts and parses arguments from the context.

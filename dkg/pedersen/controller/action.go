@@ -213,6 +213,7 @@ func (a *encryptAction) Execute(ctx node.Context) error {
 	}
 
 	err = ioutil.WriteFile(KfilePath, Kmarshalled, os.ModePerm)
+	fmt.Fprint(ctx.Out, string(Kmarshalled))
 	if err != nil {
 		return xerrors.Errorf("failed to write file: %v", err)
 	}
@@ -223,6 +224,8 @@ func (a *encryptAction) Execute(ctx node.Context) error {
 	}
 
 	err = ioutil.WriteFile(CfilePath, Cmarshalled, os.ModePerm)
+	fmt.Fprint(ctx.Out, "-----------------")
+	fmt.Fprint(ctx.Out, string(Cmarshalled))
 	if err != nil {
 		return xerrors.Errorf("failed to write file: %v", err)
 	}

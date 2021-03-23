@@ -34,6 +34,8 @@ func (miniController) SetCommands(builder node.Builder) {
 	cmd := builder.SetCommand("pool")
 	cmd.SetDescription("interact with the pool")
 
+	client := &client{}
+
 	sub := cmd.SetSubCommand("add")
 	sub.SetDescription("add a transaction to the pool")
 	sub.SetFlags(cli.StringSliceFlag{
@@ -50,8 +52,29 @@ func (miniController) SetCommands(builder node.Builder) {
 		Required: true,
 	})
 	sub.SetAction(builder.MakeAction(&addAction{
-		client: &client{},
+		client: client,
 	}))
+
+	sub = cmd.SetSubCommand("addFile")
+	sub.SetDescription("add a transaction to the pool")
+	sub.SetFlags(cli.StringSliceFlag{
+		Name:  "args",
+		Usage: "list of key-value pairs",
+	}, cli.IntFlag{
+		Name:     nonceFlag,
+		Usage:    "nonce to use",
+		Required: false,
+		Value:    -1,
+	}, cli.StringFlag{
+		Name:     signerFlag,
+		Usage:    "path to the private keyfile",
+		Required: true,
+	})
+	sub.SetAction(builder.MakeAction(&addFileAction{
+		client: client,
+	}))
+
+
 }
 
 // OnStart implements node.Initializer
